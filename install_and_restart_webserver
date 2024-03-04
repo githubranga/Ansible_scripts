@@ -1,0 +1,13 @@
+#playbook to install a webserver and start the webserver and on the dev group of servers. 
+---
+- hosts: dev
+  tasks:
+  - name: install webserver
+    yum: 
+      name: httpd
+      state: latest
+  - name: Start webserver, if not started
+    service:
+      name: httpd
+      state: started
+
