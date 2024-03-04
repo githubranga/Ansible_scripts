@@ -1,0 +1,8 @@
+#playbook to install a httpd software on the dev group of servers. 
+---
+- hosts: dev
+  tasks:
+  - name: install webserver
+    yum: 
+      name: httpd
+      state: latest
