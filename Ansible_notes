@@ -1,0 +1,308 @@
+Ansible
+========
+REDhat -- automation tool -- configuration tool 
+
+Ansible
+
+agentless -- TLS cert 
+
+Usecase: 1 -- webserver and database servers needs to be restarted in sequence 
+
+	you could write ansible playbook to get this done in a matter of minutes. and Simply invoke ansible playbook when you wish to restart 
+
+Usecase: 2 -- multiple servers deployed spaned across public and priave cloud (cloud and on-primise) 
+
+	-configuring applications, setting up communication betn them 
+	- modifying config files, installing applications, configuring firewall rules.. etc 
+
+there are lot built in modules available in Ansible that supports these kind of operations. 
+
+we can easily integrate this the tools or CMDB. Service Now 
+
+==== Installation of ansible and target servers in AWS (as ec2) 
+
+pre-req: Python is pre-req for ansible 
+
+amazon-linux-extras install ansible -y -- Install ansible OR yum install ansible -y 
+
+ansible --version 
+
+=> ansible configuration stores at /etc/ansible/ansible.cfg 
+=> hosts file in /etc/ansible is called inventory file , here you can keep target server ips. even you can group them if needed 
+=> SSH passwordless conntivity betwen control node and target nodes 
+
+1. create the pub andn priv keys on the server side (Ansible contol node). 
+	ssh-keygen -t rsa -- it generates pub key and private key 
+	cat ~/.ssh/id_rsa.pub --- copy the o/p of this command to the target server
+
+2. copy the public key to the target node. (.ssh/authorized_keys)
+	cd /root/.ssh  --- by default it goes to ec2-user.. so make sure you go to /root/.ssh 
+	vi authorized_keys -- append or paste the above o/p
+
+3. verify the connectivity now from server to target node 
+	ssh <target_server_ip> 
+
+=== Run the command thru commmand line.. these are called adhoc commands. to test something quickly, we use ad-hoc commands. 
+
+ansible -m command -a "yum install httpd -y" <prod> --- m --> module name, a--> argument to install pakg, <prod> --> target server group name
+ansible all -m command -a "systemctl stop httpd" -i inventory
+
+ansible -m copy -a "src=/root/test.sh dest=/root/test.sh" -i inventory DEV 
+ansible -m shell -a "sh /root/test.sh" -i inventory DEV
+ 
+ansible -m service -a "name=httpd state=started" -i inventory DEV 
+ansible -m service -a "name=httpd state=stopped" -i inventory DEV 
+
+==> if we need to run multiple commands or tasks, we have to use playbooks in Ansible
+
+Example: Refer https://docs.ansible.com/ansible/2.9/modules/yum_module.html#yum-module
+
+Q: write a playbook to install a httpd software on the dev group of servers. 
+
+---
+- hosts: dev
+  tasks:
+  - name: install webserver
+    yum: 
+      name: httpd
+      state: latest
+
+Q: write a playbook to install a webserver and start the webserver and on the dev group of servers. 
+
+Refer- https://docs.ansible.com/ansible/2.9/modules/service_module.html#service-module
+
+---
+- hosts: DEV, PROD or all 
+  tasks:
+  - name: install webserver
+    yum: 
+      name: httpd
+      state: latest
+  - name: Start webserver, if not started
+    service:
+      name: httpd
+      state: started
+
+ansible-playbook <playbook_file_name> ---> ansible-playbook install.yaml 
+
+Ansible Role
+===========
+
+
+Demo (setting up lab environment) 
+====
+
+ORacle VM 
+osboxes.org -- you can see multiple images of OS 
+
+osboxes.org -- is the passwd 
+
+ifconfig -- you can see the VMs ip address 
+
+cd /etc/ansible
+vi ansible.cfg 
+
+host_key_checking = false 
+
+is there any agent required on the target side, if control node wants to talk to agent node? No... 
+
+
+Ansible Inventory
+===========
+
+Ansible is agentless --- in the target machine you dont need to install any software to work with ansible 
+
+default inventory file -- /etc/ansible/hosts -- if you dont specify any inventory files, it uses this default inventory file 
+
+SSH KEY based authentication required in prod environment. we should not use username/password. 
+
+
+[bob@student-node playbooks]$ cat inventory 
+# Sample Inventory File
+
+# Web Servers
+web_node1 ansible_host=web01.xyz.com ansible_connection=winrm ansible_user=administrator ansible_password=Win$Pass
+web_node2 ansible_host=web02.xyz.com ansible_connection=winrm ansible_user=administrator ansible_password=Win$Pass
+web_node3 ansible_host=web03.xyz.com ansible_connection=winrm ansible_user=administrator ansible_password=Win$Pass
+
+# DB Servers
+sql_db1 ansible_host=sql01.xyz.com ansible_connection=ssh ansible_user=root ansible_ssh_pass=Lin$Pass
+sql_db2 ansible_host=sql02.xyz.com ansible_connection=ssh ansible_user=root ansible_ssh_pass=Lin$Pass
+
+[db_nodes]
+sql_db1
+sql_db2
+
+[web_nodes]
+web_node1
+web_node2
+web_node3
+
+[boston_nodes]
+sql_db1
+web_node1
+
+[dallas_nodes]
+sql_db2
+web_node2
+web_node3
+
+[us_nodes:children]
+boston_nodes
+dallas_nodes
+
+[bob@student-node playbooks]$ vi inventory 
+[bob@student-node playbooks]$ cat inventory 
+# Sample Inventory File
+
+# Web Servers
+web_node1 ansible_host=web01.xyz.com ansible_connection=winrm ansible_user=administrator ansible_password=Win$Pass
+web_node2 ansible_host=web02.xyz.com ansible_connection=winrm ansible_user=administrator ansible_password=Win$Pass
+web_node3 ansible_host=web03.xyz.com ansible_connection=winrm ansible_user=administrator ansible_password=Win$Pass
+
+# DB Servers
+sql_db1 ansible_host=sql01.xyz.com ansible_connection=ssh ansible_user=root ansible_ssh_pass=Lin$Pass
+sql_db2 ansible_host=sql02.xyz.com ansible_connection=ssh ansible_user=root ansible_ssh_pass=Lin$Pass
+
+[db_nodes]
+sql_db1
+sql_db2
+
+[web_nodes]
+web_node1
+web_node2
+web_node3
+
+[boston_nodes]
+sql_db1
+web_node1
+
+[dallas_nodes]
+sql_db2
+web_node2
+web_node3
+
+[us_nodes:children]   <<<<--- here grouping of the groups.. mentioning the groups 
+boston_nodes
+dallas_nodes
+
+[bob@student-node playbooks]$ 
+
+
+Ansible Playbooks
+===========
+
+set of instructions that we are passing to Ansibl to work on. 
+all playbooks are written in YAML format. 
+
+==> playbook is a single yaml file containing a set of plays. 
+
+     ==> A play defines, a set of activities to be run on a single or group of hosts 
+            
+          ==> A task is a single action to be perfored on host 
+
+In dictionary -- Order is not a matter 
+In list or array as these are denoted by dashes-- Order is matter and that affects. lists are ordered collections 
+
+ansible-playbook update_service.yml --->> to run a playbook 
+ansible-playbook update_service.yml --check  ---->> this is to check before run 
+
+ansible-playbook configure_database.yml --check --diff --- To run the configure_database.yml playbook in both check mode and diff mode,
+
+ansible-playbook --syntax-check configure_database.yml --- to check  playbook for syntax errors
+
+ansible-lint database_setup.yml --- To run ansible-lint on the database_setup.yml playbook. Before deploying it, you want to ensure that it adheres to best practices and doesn't have any style-related issues.
+
+If Ansible-lint provides no output after checking a playbook, it indicates that, the playbook adheres to best practices and has no style-related issues.
+
+ansible-playbook -i inventory playbook.yaml --- To run a playbook with inventory file 
+
+Ansible Modules
+==============
+
+diffrent actions run by tasks are called Modules. 
+
+categorized into various groups based on their functionality. 
+
+Module Plugin allows you to integrate with a cloud provider's API for custom resource provisioning.
+
+Q: You've developed a custom module named custom_cloud. To test this module in a playbook named deploy.yml, which of the following task definitions is correct?
+
+- name: Provision custom cloud resource
+  custom_cloud:
+    param1: value1
+    param2: value2
+
+Q: You are tasked with setting up an Ansible playbook that automates the deployment of applications on AWS ec2 instances. Before running the playbook, you need to ensure that Ansible has an up-to-date inventory of all ec2 instances in your AWS account.
+
+Which type of Ansible plugin would you use to fetch real-time information about your AWS ec2 instances?
+
+Ans; Dynamic Inventory Plugin will be used to fetch real-time information about your AWS ec2 instances.
+
+Q: You have a custom dynamic inventory script named aws_inventory.py. Which command would you use to list all hosts in your AWS inventory using this script?
+
+a. ansible-inventory --list -i aws_inventory.py   <<<<---------- This is the answer 
+b. ansible-playbook --inventory aws_inventory.py
+c. ansible aws_inventory.py --list-hosts
+d. ansible-list --inventory aws_inventory.py
+
+Q: You are tasked with finding a module in Ansible that helps manage Cisco devices. Using the Modules & Plugins Index, which of the following modules is specifically designed for managing Cisco IOS devices?
+
+Which of the following is not a key parameter available for cisco.ios module?
+
+
+a. hostname
+
+b. password
+
+c. ios_version
+
+d. username
+
+
+cisco.ios module is specifically designed for managing Cisco IOS devices.
+
+Q: You're planning to deploy an application on AWS and need to set up ec2 instances using Ansible. Which module is primarily used for managing ec2 instances?
+ec2_instance module is primarily used for managing ec2 instances.
+
+Ansible Variables
+==========
+
+=====Prepare a demo using ec2 
+
+create 3 ec2 instances 
+	1. control node
+	2. target nodes -2 
+
+cd /etc/ansible/hosts 
+
+ansible -m command -a "yum install httpd -y" <prod> ---- to install http on prod environment grup. 
+
+==========   Ansible interview questions   ========================
+
+==>Ansible Vault:
+
+To protect sensitive data with encrypted files or elements in Ansible, you can use Ansible Vault. Ansible Vault is a feature in Ansible that allows you to encrypt sensitive data using a password, and then decrypt it when needed during playbook execution.
+
+==>How do we use ansible facts? 
+
+==>How do you manage the order of execution in playbook? 
+
+Ans: you can use "serial" keyword to manager the order of execution in playbook 
+
+==> what is dynamic inventory in ansible? 
+
+it allows you to fetch inventory details from external sources like databases , cloud provider, custom scripts something 
+
+==> what is winrm 
+
+windown remote management 
+
+==> Ansible is combination of 3 components 
+
+-- 1. Modules 2. Playbook 3.Plugins (special kind of modules.. usually used for logging purpose) 
+
+==> why should i use Ansible tower? 
+
+it is created by Red hat. Ansible comes as UI. 
+
